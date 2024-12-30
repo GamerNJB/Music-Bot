@@ -1,6 +1,5 @@
 import discord
 from discord.ext import commands
-from discord import app_commands
 import os
 import time
 import yt_dlp  # Updated to yt-dlp
@@ -35,20 +34,9 @@ async def on_ready():
 @bot.tree.command()
 async def help(interaction: discord.Interaction):
     """Help"""  # Description when viewing / commands
-    await interaction.response.send_message("hello")
+    await interaction.response.send_message("Hello! Use `/add [url] [title]` to add a song, `/songlist` to list available songs, and more.")
 
-#------ Sync Tree ------
-@bot.command()
-@commands.is_owner()
-async def sync(ctx: commands.Context):
-    """Sync commands globally."""
-    try:
-        await ctx.bot.tree.sync()
-        await ctx.send("Synced commands globally.")
-    except Exception as e:
-        await ctx.send(f"Error syncing commands: {str(e)}")
-
-#------ Add Command (Add Song) ------
+#------ /add Command (Add Song) ------
 @bot.tree.command(name="add", description="Add a song to the playlist")
 async def add(interaction: discord.Interaction, url: str, title: str):
     try:
@@ -106,7 +94,7 @@ async def add(interaction: discord.Interaction, url: str, title: str):
     except Exception as e:
         await interaction.response.send_message(f"Error adding the song: {str(e)}")
 
-#------ /songlist Command ------
+#------ /songlist Command (List All MP3 Files) ------
 @bot.tree.command(name="songlist", description="List all the MP3 files in the server's folder")
 async def songlist(interaction: discord.Interaction):
     """List all MP3 files in the server's folder."""
@@ -126,7 +114,7 @@ async def songlist(interaction: discord.Interaction):
     else:
         await interaction.response.send_message("No MP3 files found in the server's folder.")
 
-#------ Example Slash Command to Join Voice Channel ------
+#------ /join Command (Join the Voice Channel) ------
 @bot.tree.command(name="join", description="Join the voice channel")
 async def join(interaction: discord.Interaction):
     """Join the voice channel."""
@@ -137,7 +125,7 @@ async def join(interaction: discord.Interaction):
     else:
         await interaction.response.send_message("You need to be in a voice channel to use this command.")
 
-#------ Example Slash Command to Stop Music------
+#------ /stop Command (Stop the Currently Playing Song) ------
 @bot.tree.command(name="stop", description="Stop the currently playing song")
 async def stop(interaction: discord.Interaction):
     """Stop the currently playing song."""
@@ -147,10 +135,22 @@ async def stop(interaction: discord.Interaction):
     else:
         await interaction.response.send_message("No music is currently playing.")
 
-#------ Example Slash Command to Play Song ------
-@bot.tree.command(name="play", description="Play a song by name")
+#------ /play Command (Play the Selected Song) ------
+@bot.tree.command(name="play", description="Play a song from the server's playlist")
 async def play(interaction: discord.Interaction, songname: str):
     """Play a song."""
+    guild_folder = str(interaction.guild.id)
+    song_path = os.path.join(guild_folder, f"{songname}.mp3")
+
+    if not os.path.exists(guild_folder):
+        await interaction.response.send_message("No songs found for this server.")
+        return
+
+    if not os.path.isfile(song_path):
+        await interaction.response.send_message(f"Song {songname} not found.")
+        return
+
+    # Join the voice channel if not already in one
     if interaction.guild.voice_client is None:
         if interaction.user.voice:
             await interaction.user.voice.channel.connect()
@@ -158,17 +158,9 @@ async def play(interaction: discord.Interaction, songname: str):
             await interaction.response.send_message("You need to be in a voice channel to play music.")
             return
 
-    if interaction.guild.voice_client.is_playing():
-        await interaction.response.send_message("Already playing audio.")
-        return
+    # Play the requested song
+    audio_source = discord.FFmpegPCMAudio(song_path)
+    interaction.guild.voice_client.play(audio_source, after=lambda e: print(f'Finished playing {songname}'))
+    await interaction.response.send_message(f"Now playing {songname}")
 
-    song_path = os.path.join(os.getcwd(), f'{songname}.mp3')
-    if os.path.isfile(song_path):
-        audio_source = discord.FFmpegPCMAudio(song_path)
-        interaction.guild.voice_client.play(audio_source, after=lambda e: print(f'Finished playing {songname}'))
-        await interaction.response.send_message(f"Now playing {songname}")
-    else:
-        await interaction.response.send_message("Song not found.")
-
-# Run the bot with your token loaded from the .env file
 bot.run(TOKEN)
