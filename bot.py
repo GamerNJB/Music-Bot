@@ -2,7 +2,7 @@ import discord
 from discord.ext import commands
 import yt_dlp as youtube_dl
 import os
-import re
+import time
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -11,15 +11,9 @@ TOKEN = os.getenv('DISCORD_BOT_TOKEN')
 intents = discord.Intents.all()
 bot = commands.Bot(command_prefix='/', intents=intents)
 
-
-def sanitize_filename(name):
-    return re.sub(r'[\\/*?:"<>|]', "", str(name)).replace(' ', '_')
-
-
 @bot.event
 async def on_ready():
     print(f'Logged in as {bot.user}')
-
 
 @bot.command()
 async def join(ctx):
@@ -27,56 +21,64 @@ async def join(ctx):
         channel = ctx.author.voice.channel
         await channel.connect()
     else:
-        await ctx.send("You need to be in a voice channel to use this command."
-                       )
-
+        await ctx.send("You need to be in a voice channel to use this command.")
 
 @bot.command()
-async def add(ctx, name_or_link: str):
+async def add(ctx, url: str, *, title: str = None):
     try:
-        # Check if the input is a URL
-        if name_or_link.startswith('http'):
-            ydl_opts = {
-                'format': 'bestaudio/best',
-                'outtmpl':
-                f'{sanitize_filename(ctx.guild.id)}/%(title)s.%(ext)s',
-                'noplaylist': True,
-            }
-            with youtube_dl.YoutubeDL(ydl_opts) as ydl:
-                info = ydl.extract_info(name_or_link, download=True)
-                song_name = sanitize_filename(info.get('title', None))
-        else:
-            song_name = sanitize_filename(name_or_link)
+        if not title:
+            await ctx.send("Please provide a title for the song using `/add [url] [title]`.")
+            return
 
-        # Place the song in the correct folder
-        guild_folder = sanitize_filename(str(ctx.guild.id))
+        # Define the folder based on the server ID
+        guild_folder = str(ctx.guild.id)
         if not os.path.exists(guild_folder):
             os.makedirs(guild_folder)
-        song_path = f"{guild_folder}/{song_name}.mp3"
 
-        if not os.path.isfile(song_path):
-            await ctx.send(f"Downloaded and added {song_name} to the playlist."
-                           )
-        else:
-            await ctx.send(f"{song_name} already exists in the playlist.")
+        # Define the temporary download file path
+        temp_file_path = f'{guild_folder}/{title}.webm'
 
+        # Set up the download options for yt-dlp
+        ydl_opts = {
+            'format': 'bestaudio/best',
+            'outtmpl': temp_file_path,
+            'postprocessors': [{
+                'key': 'FFmpegExtractAudio',
+                'preferredcodec': 'mp3',
+                'preferredquality': '192',
+            }],
+            'noplaylist': True,
+        }
+
+        # Download the audio file
+        with youtube_dl.YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(url, download=True)
+
+        # Wait to ensure the download completes
+        time.sleep(1)
+
+        # Define the final mp3 file path
+        final_mp3_path = f'{guild_folder}/{title}.mp3'
+
+        # Rename the webm file to mp3
+        if os.path.isfile(temp_file_path):
+            os.rename(temp_file_path, final_mp3_path)
+
+        await ctx.send(f"Downloaded and added {title} to the playlist.")
     except Exception as e:
         await ctx.send(f"Error adding the song: {str(e)}")
-
 
 @bot.command()
 async def playlist(ctx, action, playlist_name=None, *, url=None):
     playlist_folder = os.path.join(os.getcwd(),
-                                   sanitize_filename(ctx.guild.id),
-                                   sanitize_filename(playlist_name))
+                                   str(ctx.guild.id),
+                                   playlist_name)
     if action == "add" and playlist_name and url:
         if not os.path.exists(playlist_folder):
             os.makedirs(playlist_folder)
         ydl_opts = {
-            'format':
-            'bestaudio/best',
-            'outtmpl':
-            f'{playlist_folder}/%(title)s.%(ext)s',
+            'format': 'bestaudio/best',
+            'outtmpl': f'{playlist_folder}/%(title)s.%(ext)s',
             'postprocessors': [{
                 'key': 'FFmpegExtractAudio',
                 'preferredcodec': 'mp3',
@@ -103,8 +105,8 @@ async def playlist(ctx, action, playlist_name=None, *, url=None):
             return
 
         playlist_folder = os.path.join(os.getcwd(),
-                                       sanitize_filename(ctx.guild.id),
-                                       sanitize_filename(playlist_name))
+                                       str(ctx.guild.id),
+                                       playlist_name)
         if os.path.exists(playlist_folder):
             files = os.listdir(playlist_folder)
             if files:
@@ -120,7 +122,6 @@ async def playlist(ctx, action, playlist_name=None, *, url=None):
         else:
             await ctx.send("Playlist not found.")
 
-
 @bot.command()
 async def play(ctx, *, songname):
     if ctx.voice_client is None:
@@ -134,8 +135,8 @@ async def play(ctx, *, songname):
         await ctx.send("Already playing audio.")
         return
 
-    song_path = os.path.join(os.getcwd(), sanitize_filename(ctx.guild.id),
-                             f'{sanitize_filename(songname)}.mp3')
+    song_path = os.path.join(os.getcwd(), str(ctx.guild.id),
+                             f'{songname}.mp3')
     if os.path.isfile(song_path):
         audio_source = discord.FFmpegPCMAudio(song_path)
         ctx.voice_client.play(
@@ -145,7 +146,6 @@ async def play(ctx, *, songname):
     else:
         await ctx.send("Song not found.")
 
-
 @bot.command()
 async def stop(ctx):
     if ctx.voice_client and ctx.voice_client.is_playing():
@@ -154,10 +154,9 @@ async def stop(ctx):
     else:
         await ctx.send("No audio is playing currently.")
 
-
 @bot.command()
 async def songlist(ctx):
-    song_folder = os.path.join(os.getcwd(), sanitize_filename(ctx.guild.id))
+    song_folder = os.path.join(os.getcwd(), str(ctx.guild.id))
     if os.path.exists(song_folder):
         songs = [f for f in os.listdir(song_folder) if f.endswith('.mp3')]
         if songs:
