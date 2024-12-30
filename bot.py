@@ -1,6 +1,5 @@
 import discord
 from discord.ext import commands
-import yt_dlp as youtube_dl
 import os
 import time
 from dotenv import load_dotenv
@@ -73,9 +72,19 @@ async def playlist(ctx, action, playlist_name=None, *, url=None):
     playlist_folder = os.path.join(os.getcwd(),
                                    str(ctx.guild.id),
                                    playlist_name)
+
     if action == "add" and playlist_name and url:
+        # Check if the song already exists in the playlist
+        if os.path.exists(playlist_folder):
+            files = os.listdir(playlist_folder)
+            for file in files:
+                if file.endswith(".mp3") and file.lower() in url.lower():
+                    await ctx.send(f"{file} already exists in the playlist.")
+                    return
+
         if not os.path.exists(playlist_folder):
             os.makedirs(playlist_folder)
+
         ydl_opts = {
             'format': 'bestaudio/best',
             'outtmpl': f'{playlist_folder}/%(title)s.%(ext)s',
@@ -91,13 +100,13 @@ async def playlist(ctx, action, playlist_name=None, *, url=None):
             await ctx.send(f"Added {url} to the playlist {playlist_name}!")
         except Exception as e:
             await ctx.send(f"Error downloading the song: {str(e)}")
+
     elif action == "play" and playlist_name:
         if ctx.voice_client is None:
             if ctx.author.voice:
                 await ctx.author.voice.channel.connect()
             else:
-                await ctx.send(
-                    "You need to be in a voice channel to play music.")
+                await ctx.send("You need to be in a voice channel to play music.")
                 return
 
         if ctx.voice_client.is_playing():
@@ -108,7 +117,7 @@ async def playlist(ctx, action, playlist_name=None, *, url=None):
                                        str(ctx.guild.id),
                                        playlist_name)
         if os.path.exists(playlist_folder):
-            files = os.listdir(playlist_folder)
+            files = [f for f in os.listdir(playlist_folder) if f.endswith('.mp3')]
             if files:
                 for file in files:
                     file_path = os.path.join(playlist_folder, file)
