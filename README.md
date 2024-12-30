@@ -12,7 +12,7 @@ DISCORD_BOT_TOKEN=your_token
 replace your_token with the token you copied from discord
 then, inside of command prompt, type
 
-       pip install discord.py yt-dlp python-dotenv pydub aiohttp
+       pip install discord.py yt-dlp python-dotenv pydub aiohttp PyNaCl
 
 make sure ffmpeg is installed
 
