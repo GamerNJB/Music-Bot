@@ -12,13 +12,17 @@ DISCORD_BOT_TOKEN=your_token
 replace your_token with the token you copied from discord
 then, inside of command prompt, type
 
-pip install discord.py yt-dlp python-dotenv pydub aiohttp
+       pip install discord.py yt-dlp python-dotenv pydub aiohttp
 
 make sure ffmpeg is installed
 
-Mac OS: brew install ffmpeg
+Mac OS:       
+       
+       brew install ffmpeg
 
-Linux: sudo apt update
+Linux: 
+       
+       sudo apt update
 
        sudo apt install ffmpeg
 
