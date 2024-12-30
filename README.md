@@ -19,6 +19,7 @@ make sure ffmpeg is installed
 Mac OS: brew install ffmpeg
 
 Linux: sudo apt update
+
        sudo apt install ffmpeg
 
 Windows: https://ffmpeg.org/download.html
